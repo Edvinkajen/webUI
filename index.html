@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WiFi Alkomätare</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#050816">
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Alkomätare">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+  <style>
+    /* ======= Din CSS (nästan oförändrad) ======= */
+    :root {
+      --bg: #050816;
+      --bg-elevated: #0b1020;
+      --bg-soft: #131933;
+      --accent: #4f46e5;
+      --accent-soft: rgba(79, 70, 229, 0.1);
+      --accent-strong: rgba(79, 70, 229, 0.35);
+      --text: #e5e7eb;
+      --text-muted: #9ca3af;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --border: #1f2937;
+      --radius-xl: 1.25rem;
+      --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.55);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+    body { background: radial-gradient(circle at top, #111827 0, #020617 45%); color: var(--text); min-height: 100vh; display: flex; justify-content: center; padding: 16px; }
+    .app { width: 100%; max-width: 1100px; }
+
+    header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:12px; }
+    .title-group h1 { font-size: 1.5rem; letter-spacing: 0.03em; }
+    .title-group p { color: var(--text-muted); font-size: 0.9rem; }
+
+    .badge { padding: 6px 12px; border-radius: 999px; font-size: 0.8rem; border: 1px solid var(--accent-soft);
+      background: radial-gradient(circle at top left, var(--accent-soft), transparent); display: inline-flex; align-items: center; gap: 6px; }
+    .badge-dot { width: 8px; height: 8px; border-radius: 999px; background: #22c55e; box-shadow: 0 0 10px rgba(34, 197, 94, 0.9); }
+
+    main.layout { display:grid; grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.4fr); gap:16px; }
+    @media (max-width: 840px) { main.layout { grid-template-columns: minmax(0, 1fr); } }
+
+    .panel { background: linear-gradient(145deg, #020617, #020617 50%, #020617 55%, #020617);
+      border-radius: var(--radius-xl); border: 1px solid var(--border); box-shadow: var(--shadow-soft);
+      padding: 14px 14px 16px; position: relative; overflow: hidden; }
+    .panel::before { content:""; position:absolute; inset:-40%; opacity:0.25;
+      background: radial-gradient(circle at 10% 0%, rgba(79, 70, 229, 0.3), transparent 50%),
+                  radial-gradient(circle at 90% 0%, rgba(14, 165, 233, 0.25), transparent 45%);
+      pointer-events:none; mix-blend-mode:screen; }
+    .panel-inner { position: relative; z-index: 1; }
+
+    .panel-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; gap:8px; }
+    .panel-header h2 { font-size: 1.05rem; font-weight: 600; }
+    .panel-header span { font-size: 0.8rem; color: var(--text-muted); }
+
+    .chip { font-size:0.75rem; padding:4px 9px; border-radius:999px; background: rgba(15, 23, 42, 0.9);
+      border:1px solid var(--border); color: var(--text-muted); display:inline-flex; align-items:center; gap:6px; }
+
+    .live-stats { display:grid; grid-template-columns: 1.3fr 1fr; gap:10px; margin-bottom:14px; align-items:stretch; }
+    @media (max-width: 600px) { .live-stats { grid-template-columns: 1fr; } }
+
+    .card { background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.9), rgba(3, 7, 18, 0.95));
+      border-radius: 1rem; border: 1px solid rgba(31, 41, 55, 0.9); padding: 10px 12px;
+      display:flex; flex-direction:column; justify-content:space-between; gap:4px; min-height:75px; }
+    .card-label { font-size:0.8rem; color: var(--text-muted); display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+    .card-main-value { font-size:1.8rem; font-weight:600; letter-spacing:0.04em; }
+    .card-sub { font-size:0.75rem; color: var(--text-muted); }
+
+    .pill { display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:999px;
+      background: rgba(22, 163, 74, 0.12); border: 1px solid rgba(34, 197, 94, 0.25); font-size: 0.7rem; color:#bbf7d0; }
+    .small-dot { width:6px; height:6px; border-radius:999px; background:#22c55e; }
+
+    .chart-container { margin-top:4px; border-radius:0.9rem;
+      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.9), rgba(3, 7, 18, 0.95));
+      border: 1px solid rgba(31, 41, 55, 0.9); padding: 8px 10px 10px; }
+    .chart-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; gap:8px; }
+    .chart-header span { font-size:0.8rem; color: var(--text-muted); }
+    .legend-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    canvas { width: 100% !important; height: 230px !important; }
+
+    .section { margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid rgba(31, 41, 55, 0.85); }
+    .section:last-child { border-bottom:none; padding-bottom:0; margin-bottom:0; }
+    .section-title { font-size:0.85rem; text-transform:uppercase; letter-spacing:0.12em; color: var(--text-muted); margin-bottom:6px; }
+
+    .field-group { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
+    label { font-size:0.8rem; color: var(--text-muted); }
+    select, input[type="text"], input[type="number"], input[type="password"], input[type="color"] {
+      width:100%; padding:6px 9px; border-radius:0.6rem; border:1px solid rgba(55, 65, 81, 0.9);
+      background: rgba(15, 23, 42, 0.95); color: var(--text); font-size:0.85rem; outline:none; }
+    select:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.4); }
+    .inline-fields { display:flex; gap:6px; }
+    .inline-fields > * { flex:1; }
+
+    button {
+      border-radius: 0.7rem; border:1px solid transparent; background: linear-gradient(135deg, var(--accent), #6366f1);
+      color:white; font-size:0.85rem; font-weight:500; padding:7px 10px; cursor:pointer;
+      display:inline-flex; align-items:center; justify-content:center; gap:6px;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.08s ease;
+      box-shadow: 0 10px 25px rgba(79, 70, 229, 0.45); white-space:nowrap;
+    }
+    button:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 14px 35px rgba(79, 70, 229, 0.65); }
+    button:active { transform: translateY(0); box-shadow: 0 8px 18px rgba(79, 70, 229, 0.55); }
+    button.secondary { background: rgba(15, 23, 42, 0.95); border-color: rgba(55, 65, 81, 0.9); box-shadow:none; color: var(--text-muted); }
+    button.secondary:hover { filter:none; border-color: var(--accent); color: var(--text); box-shadow: 0 6px 16px rgba(15, 23, 42, 0.9); }
+    button.danger { background: linear-gradient(135deg, #b91c1c, #ef4444); box-shadow: 0 10px 25px rgba(248, 113, 113, 0.35); }
+
+    .btn-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+    .muted { font-size:0.8rem; color: var(--text-muted); }
+
+    .table-wrapper { max-height:190px; overflow:auto; border-radius:0.7rem; border:1px solid rgba(31,41,55,0.9); background: rgba(3, 7, 18, 0.9); }
+    table { width:100%; border-collapse:collapse; font-size:0.78rem; }
+    thead { position:sticky; top:0; background: rgba(15, 23, 42, 0.98); z-index:2; }
+    th, td { padding:5px 7px; text-align:left; border-bottom:1px solid rgba(31,41,55,0.75); white-space:nowrap; }
+    th { font-weight:500; color: var(--text-muted); }
+    tbody tr:last-child td { border-bottom:none; }
+
+    .tag { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:2px 7px; font-size:0.72rem;
+      background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(55, 65, 81, 0.9); }
+    .tag-color { width:8px; height:8px; border-radius:999px; border:1px solid rgba(15, 23, 42, 0.7); }
+
+    .admin-header { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
+    .admin-info { font-size:0.75rem; color: var(--text-muted); }
+    .admin-panel { margin-top:6px; padding:8px; border-radius:0.8rem;
+      background: radial-gradient(circle at top left, rgba(79, 70, 229, 0.08), rgba(15, 23, 42, 0.95));
+      border: 1px solid rgba(55, 65, 81, 0.9); display:none; }
+    .admin-panel.visible { display:block; }
+    .badge-admin { font-size:0.7rem; text-transform:uppercase; letter-spacing:0.18em; color:#f97316; }
+    .admin-section { margin-top:6px; padding-top:6px; border-top:1px dashed rgba(55,65,81,0.8); }
+    .admin-user-filters { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+    .admin-user-filters label { display:inline-flex; align-items:center; gap:4px; font-size:0.78rem; padding:3px 7px; border-radius:999px;
+      background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(55, 65, 81, 0.9); cursor:pointer; }
+    .admin-user-filters input[type="checkbox"] { accent-color: var(--accent); }
+
+    .user-stats-header { font-size:0.8rem; color: var(--text-muted); margin-bottom:6px; }
+    .user-stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin-top:6px; }
+    .user-stat-card { background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.9), rgba(3, 7, 18, 0.95));
+      border-radius: 0.9rem; border: 1px solid rgba(31, 41, 55, 0.9); padding: 8px 10px; display:flex; flex-direction:column; gap:2px; min-height:56px; }
+    .user-stat-label { font-size:0.75rem; color: var(--text-muted); }
+    .user-stat-value { font-size:0.95rem; font-weight:500; }
+    .user-stat-sub { font-size:0.72rem; color: var(--text-muted); }
+    .user-stats-empty { font-size:0.8rem; color: var(--text-muted); padding:8px 10px; border-radius:0.7rem; border:1px dashed rgba(55,65,81,0.9);
+      background: rgba(15, 23, 42, 0.7); margin-top:4px; }
+    .trend-positive { color: #22c55e; }
+    .trend-negative { color: #ef4444; }
+    .trend-neutral  { color: #e5e7eb; }
+
+    /* ======= Nytt: install-banner + modal ======= */
+    .topbar {
+      display:flex; gap:10px; align-items:center; justify-content:space-between;
+      margin-bottom: 12px;
+    }
+    .install-banner {
+      display:none;
+      padding: 8px 10px;
+      border-radius: 0.9rem;
+      border: 1px solid rgba(55,65,81,0.9);
+      background: rgba(15, 23, 42, 0.95);
+      color: var(--text);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      gap: 10px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .install-banner.visible { display:flex; }
+    .install-banner .muted { margin-top:2px; }
+
+    .modal-backdrop {
+      display:none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 9999;
+    }
+    .modal-backdrop.visible { display:flex; }
+    .modal {
+      width: min(520px, 100%);
+      border-radius: 1rem;
+      border: 1px solid rgba(55,65,81,0.9);
+      background: rgba(3, 7, 18, 0.98);
+      box-shadow: 0 18px 45px rgba(0,0,0,0.65);
+      padding: 14px;
+    }
+    .modal h3 { font-size: 1.05rem; margin-bottom: 6px; }
+    .modal p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.35; }
+    .modal .steps { margin: 10px 0; color: var(--text); font-size: 0.9rem; }
+    .modal .steps li { margin: 6px 0; }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <!-- Install banner (riktig install där möjligt, iOS visar instruktioner) -->
+    <div class="install-banner" id="installBanner">
+      <div>
+        <div style="font-weight:600;">Installera Alkomätare</div>
+        <div class="muted" id="installBannerHint">Kör som app från hemskärmen.</div>
+      </div>
+      <div class="btn-row" style="margin-top:0;">
+        <button id="installBtn">Installera</button>
+        <button class="secondary" id="dismissInstallBtn">Inte nu</button>
+      </div>
+    </div>
+
+    <!-- iOS install modal -->
+    <div class="modal-backdrop" id="iosInstallModal">
+      <div class="modal">
+        <h3>Installera på iPhone/iPad</h3>
+        <p>iOS visar inte alltid en riktig “Installera”-prompt. Gör så här i Safari:</p>
+        <ol class="steps">
+          <li>Tryck på <b>Dela</b> (fyrkant med pil upp).</li>
+          <li>Välj <b>Lägg till på hemskärmen</b>.</li>
+          <li>Starta appen via ikonen på hemskärmen.</li>
+        </ol>
+        <div class="btn-row">
+          <button class="secondary" id="closeIosModal">Stäng</button>
+        </div>
+      </div>
+    </div>
+
+    <header>
+      <div class="title-group">
+        <h1>WiFi Alkomätare</h1>
+        <p>Live-mätningar per användare, logg & export som CSV.</p>
+      </div>
+      <div class="badge">
+        <span class="badge-dot"></span>
+        <span id="statusLine">Ingen anslutning</span>
+      </div>
+    </header>
+
+    <div class="topbar">
+      <div class="btn-row">
+        <button class="secondary" id="connectWsBtn">Anslut WebSocket (ESP)</button>
+        <button class="secondary" id="connectBleBtn">Anslut Bluetooth (BLE)</button>
+        <button class="secondary" id="startSimBtn">Starta simulator</button>
+        <button class="secondary" id="stopSimBtn" style="display:none;">Stoppa simulator</button>
+      </div>
+      <div class="muted" id="envHint"></div>
+    </div>
+
+    <main class="layout">
+      <!-- Vänster: Live + graf -->
+      <section class="panel">
+        <div class="panel-inner">
+          <div class="panel-header">
+            <div>
+              <h2>Live-mätning</h2>
+              <span>Promille över tid</span>
+            </div>
+            <span class="chip" id="current-user-chip">Ingen aktiv användare</span>
+          </div>
+
+          <div class="live-stats">
+            <div class="card">
+              <div class="card-label">
+                <span>Aktuell promille</span>
+                <span class="pill"><span class="small-dot"></span> Senaste mätning</span>
+              </div>
+              <div class="card-main-value" id="live-value">–</div>
+              <div class="card-sub" id="live-meta">Ingen mätning ännu</div>
+            </div>
+
+            <div class="card">
+              <div class="card-label">
+                <span>Statistik (global logg)</span>
+              </div>
+              <div class="card-sub" id="session-stats">
+                0 mätningar • max – • medel –
+              </div>
+              <div class="card-sub">
+                Aktiv användare: <span id="active-user-label">Ingen</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-container">
+            <div class="chart-header">
+              <span>Historik</span>
+              <span class="muted" id="dataset-legend">Inga mätningar än</span>
+            </div>
+            <canvas id="measurementChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Höger: användare, lista, admin + BLE settings -->
+      <section class="panel">
+        <div class="panel-inner">
+
+          <div class="section">
+            <div class="section-title">Anslutning</div>
+            <div class="field-group">
+              <label for="espHost">ESP host (för WS)</label>
+              <input type="text" id="espHost" placeholder="ex: 192.168.4.1 eller esp32.local" />
+              <p class="muted">
+                Tips: Om du kör sidan på GitHub Pages (https) och din ESP bara har ws:// så kan webbläsaren blocka mixed content.
+                Då är BLE eller ESP:s egen lokala webbsida enklast.
+              </p>
+            </div>
+
+            <div class="field-group">
+              <label for="bleService">BLE Service UUID</label>
+              <input type="text" id="bleService" placeholder="ex: 6e400001-b5a3-f393-e0a9-e50e24dcca9e" />
+            </div>
+            <div class="inline-fields">
+              <div class="field-group">
+                <label for="bleChar">BLE Characteristic UUID (notify)</label>
+                <input type="text" id="bleChar" placeholder="ex: 6e400003-b5a3-f393-e0a9-e50e24dcca9e" />
+              </div>
+              <div class="field-group">
+                <label for="bleNamePrefix">Name prefix</label>
+                <input type="text" id="bleNamePrefix" placeholder="ex: ALKO" />
+              </div>
+            </div>
+
+            <div class="muted" id="bleSupportHint"></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Användare</div>
+            <div class="field-group">
+              <label for="user-select">Välj användare att visa statistik för</label>
+              <select id="user-select"></select>
+            </div>
+
+            <div class="field-group">
+              <label>Lägg till användare</label>
+              <div class="inline-fields">
+                <input type="text" id="new-user-name" placeholder="Namn (t.ex. Edvin)" />
+                <input type="color" id="new-user-color" value="#22c55e" />
+              </div>
+              <div class="btn-row">
+                <button id="add-user-btn">Lägg till</button>
+              </div>
+              <p class="muted">Varje användare får sin egen färg i grafen.</p>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Mätningar (hela loggen)</div>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tid</th>
+                    <th>Användare</th>
+                    <th>Promille</th>
+                  </tr>
+                </thead>
+                <tbody id="measurement-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="admin-header">
+              <div>
+                <div class="section-title">Admin</div>
+                <div class="admin-info" id="admin-status">
+                  Endast arrangörer – välj aktiv användare & hantera loggar.
+                </div>
+              </div>
+              <button class="secondary" id="toggle-admin-btn">Admin-login</button>
+            </div>
+
+            <div class="admin-panel" id="admin-panel">
+              <div class="field-group">
+                <label for="admin-password">Lösenord</label>
+                <input type="password" id="admin-password" placeholder="Adminlösen..." />
+              </div>
+              <div class="btn-row">
+                <button id="admin-confirm-btn">Aktivera admin</button>
+              </div>
+
+              <div id="admin-actions" style="display:none; margin-top:10px;">
+                <div class="badge-admin">Adminläge aktivt</div>
+
+                <div class="admin-section">
+                  <strong style="font-size:0.8rem;">Aktiv användare</strong>
+                  <p class="muted">Välj vem som blåser nu. Alla klienter ser detta.</p>
+                  <div class="field-group">
+                    <select id="active-user-select"></select>
+                  </div>
+                  <div class="btn-row">
+                    <button id="set-active-user-btn">Sätt aktiv användare</button>
+                  </div>
+                </div>
+
+                <div class="admin-section">
+                  <strong style="font-size:0.8rem;">Testmätning (debug)</strong>
+                  <p class="muted">Genererar en slumpad promille på aktiv användare.</p>
+                  <div class="btn-row">
+                    <button class="secondary" id="test-measure-btn">Testmätning</button>
+                  </div>
+                </div>
+
+                <div class="admin-section">
+                  <strong style="font-size:0.8rem;">Exportera logg</strong>
+                  <p class="muted">Bygger CSV lokalt i webbläsaren utifrån aktuell logg.</p>
+                  <div class="btn-row">
+                    <button id="download-esp-all-btn">Ladda ner alla</button>
+                  </div>
+                  <div class="field-group" style="margin-top:6px;">
+                    <label>Filtrera på användare</label>
+                    <div class="admin-user-filters" id="admin-user-filters"></div>
+                    <div class="btn-row">
+                      <button id="download-esp-filtered-btn">Ladda ner valda</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="admin-section">
+                  <strong style="font-size:0.8rem;">Rensa loggar</strong>
+                  <p class="muted">Rensar både “server state” och UI (sim/WS/BLE beroende).</p>
+                  <div class="btn-row">
+                    <button class="danger" id="clear-data-btn">Rensa loggar</button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Användarstatistik -->
+      <section class="panel">
+        <div class="panel-inner">
+          <div class="panel-header">
+            <div>
+              <h2>Användarstatistik</h2>
+              <span>För vald användare (lokalt val)</span>
+            </div>
+          </div>
+
+          <div class="user-stats-header">
+            <span id="user-stats-user-label">Ingen användare vald.</span>
+          </div>
+
+          <div id="user-stats-empty" class="user-stats-empty">
+            Välj en användare och gör minst en mätning för att se statistik.
+          </div>
+
+          <div id="user-stats-grid" class="user-stats-grid" style="display:none;">
+            <div class="user-stat-card">
+              <div class="user-stat-label">Antal mätningar</div>
+              <div class="user-stat-value" id="user-stats-count">–</div>
+            </div>
+            <div class="user-stat-card">
+              <div class="user-stat-label">Max-värde</div>
+              <div class="user-stat-value" id="user-stats-max">–</div>
+            </div>
+            <div class="user-stat-card">
+              <div class="user-stat-label">Medelvärde</div>
+              <div class="user-stat-value" id="user-stats-avg">–</div>
+            </div>
+            <div class="user-stat-card">
+              <div class="user-stat-label">Senaste mätning</div>
+              <div class="user-stat-value" id="user-stats-last">–</div>
+              <div class="user-stat-sub" id="user-stats-last-time">Tid –</div>
+            </div>
+            <div class="user-stat-card">
+              <div class="user-stat-label">Trend</div>
+              <div class="user-stat-value" id="user-stats-trend">–</div>
+              <div class="user-stat-sub">Senaste två mätningar</div>
+            </div>
+            <div class="user-stat-card">
+              <div class="user-stat-label">Tidsperiod</div>
+              <div class="user-stat-value" id="user-stats-period">–</div>
+            </div>
+            <div class="user-stat-card">
+              <div class="user-stat-label">Plats i topplista</div>
+              <div class="user-stat-value" id="user-stats-rank">–</div>
+              <div class="user-stat-sub" id="user-stats-rank-detail"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Chart.js + time adapter (HTTPS, funkar på Pages) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+  <!-- App modules -->
+  <script src="./pwa.js"></script>
+  <script src="./ble.js"></script>
+  <script src="./simulator.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
